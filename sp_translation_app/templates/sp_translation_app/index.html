@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            max-width: 600px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #loading {
+            display: none;
+            color: green;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Translation App</h1>
+
+    <div class="form-group">
+        <label for="languageSelect">Select Language:</label>
+        <select id="languageSelect">
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+        </select>
+    </div>
+
+    <div id="loading">Processing...</div>
+
+    <div class="form-group">
+        <label for="holdToTalkButton">Audio Input:</label>
+        <button id="holdToTalkButton">Hold to Talk</button>
+    </div>
+
+    <div class="form-group">
+        <button id="uploadAudio">Upload Audio</button>
+    </div>
+
+    <div class="form-group">
+        <label for="outputText">Translated Text:</label>
+        <textarea id="outputText" rows="5" readonly></textarea>
+    </div>
+
+    <script>
+        const holdToTalkButton = document.getElementById('holdToTalkButton');
+        const uploadAudioButton = document.getElementById('uploadAudio');
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+
+        // Record audio on button hold
+        holdToTalkButton.addEventListener('mousedown', () => {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        audioChunks = []; // Reset chunks
+                        console.log('Audio recorded:', audioBlob);
+                        alert('Audio recording completed. Ready for upload!');
+                    };
+                })
+                .catch(error => console.error('Error accessing microphone:', error));
+        });
+
+        holdToTalkButton.addEventListener('mouseup', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+        });
+
+        // Upload audio to server
+        uploadAudioButton.addEventListener('click', () => {
+            if (audioBlob) {
+                const selectedLanguage = document.getElementById('languageSelect').value;
+                const outputText = document.getElementById('outputText');
+                const loading = document.getElementById('loading');
+
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.wav');
+                formData.append('language', selectedLanguage);
+
+                loading.style.display = 'block';
+                outputText.value = ''; // Clear output
+
+                fetch('http://127.0.0.1:8000/api/', {
+                    method: 'POST',
+                    body: formData,
+                })
+                .then(response => response.json())
+                .then(data => {
+                    loading.style.display = 'none';
+                    if (data.translated_text) {
+                        outputText.value = data.translated_text;
+                    } else {
+                        outputText.value = 'Translation failed.';
+                    }
+                })
+                .catch(error => {
+                    loading.style.display = 'none';
+                    outputText.value = 'An error occurred during the upload.';
+                    console.error('Error:', error);
+                });
+            } else {
+                alert('No audio recorded. Please record an audio first.');
+            }
+        });
+    </script>
+    
+</body>
+</html>
