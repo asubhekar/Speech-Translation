@@ -23,6 +23,7 @@ class SpeechTranslationApp:
         recognizer = sr.Recognizer()
         # Recognizing text and language
         text = recognizer.recognize_google(audio)
+        print(text)
         lang1 = detect(text)
         return text, lang1
     
